@@ -82,3 +82,6 @@ Thumbs.db
 # Local captures (often personal)
 # ------------------------------------------------------------
 Screenshot*.png
+
+# Local persona/private profile content (never commit)
+persona*.txt
