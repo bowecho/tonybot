@@ -1,26 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-
-function getArg(name, fallback = null) {
-  const prefix = `--${name}=`;
-  const arg = process.argv.find((value) => value.startsWith(prefix));
-  return arg ? arg.slice(prefix.length) : fallback;
-}
-
-function safeJson(line) {
-  try {
-    return JSON.parse(line);
-  } catch {
-    return null;
-  }
-}
-
-function normalizeIp(value) {
-  if (!value) return value;
-  if (value === '::1') return '127.0.0.1';
-  return value;
-}
+import { getArg, normalizeIp, safeJson } from './lib/log-utils.mjs';
 
 function sanitizeFilePart(value) {
   return String(value).replace(/[^a-zA-Z0-9._-]/g, '_');

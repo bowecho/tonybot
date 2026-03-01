@@ -26,6 +26,7 @@ type ChatApiResponse = {
 
 const MIN_IDLE_MS = 12_000;
 const MAX_IDLE_MS = 45_000;
+const ACTIVITY_THROTTLE_MS = 900;
 
 function nowMs() {
   return Date.now();
@@ -88,6 +89,7 @@ export default function Home() {
   const consecutiveProactiveCountRef = useRef(0);
   const isRequestingRef = useRef(false);
   const isTypingRef = useRef(false);
+  const lastActivitySignalRef = useRef(0);
 
   const appendMessage = useCallback((role: DisplayMessage['role'], text: string) => {
     const message: DisplayMessage = { id: makeId(), role, text };
@@ -287,6 +289,11 @@ export default function Home() {
 
   useEffect(() => {
     function onAnyActivity() {
+      const now = nowMs();
+      if (now - lastActivitySignalRef.current < ACTIVITY_THROTTLE_MS) {
+        return;
+      }
+      lastActivitySignalRef.current = now;
       markUserActivity();
     }
 

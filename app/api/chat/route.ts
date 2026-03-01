@@ -12,7 +12,7 @@ import { loadSystemPrompt } from '@/lib/system-prompt';
 const chatModeSchema = z.enum(['normal', 'start', 'idle']);
 
 const chatMessageSchema = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
+  role: z.enum(['user', 'assistant']),
   text: z.string().trim().min(1).max(12000),
 });
 
@@ -40,9 +40,15 @@ function getClientIp(request: Request) {
 }
 
 async function appendConversationLog(event: Record<string, unknown>) {
-  try {
+  if (!logsDirReady) {
     const logsDir = path.join(process.cwd(), 'logs');
-    await fs.mkdir(logsDir, { recursive: true });
+    logsDirReady = fs.mkdir(logsDir, { recursive: true });
+  }
+
+  try {
+    await logsDirReady;
+
+    const logsDir = path.join(process.cwd(), 'logs');
     const dateKey = new Date().toISOString().slice(0, 10);
     const logPath = path.join(logsDir, `conversations-${dateKey}.ndjson`);
     await fs.appendFile(logPath, `${JSON.stringify(event)}\n`, 'utf8');
@@ -50,6 +56,7 @@ async function appendConversationLog(event: Record<string, unknown>) {
     // Never block chat flow if logging fails.
   }
 }
+let logsDirReady: Promise<void> | null = null;
 
 function toModelMessages(messages: Array<z.infer<typeof chatMessageSchema>>) {
   return messages.map((message) => ({
@@ -272,6 +279,33 @@ function isRetryableErrorClass(errorClass: string) {
   return errorClass === 'provider' || errorClass === 'network' || errorClass === 'timeout';
 }
 
+async function appendLlmErrorEvent({
+  requestId,
+  mode,
+  stage,
+  attempt,
+  errorClass,
+  errorMessage,
+}: {
+  requestId: string;
+  mode: z.infer<typeof chatModeSchema>;
+  stage: 'generateText' | 'output_check';
+  attempt: number;
+  errorClass: string;
+  errorMessage: string;
+}) {
+  await appendConversationLog({
+    ts: new Date().toISOString(),
+    type: 'llm_error',
+    requestId,
+    mode,
+    stage,
+    attempt,
+    errorClass,
+    errorMessage,
+  });
+}
+
 export async function POST(request: Request) {
   const requestId = makeRequestId();
   const requestStartedAt = Date.now();
@@ -362,7 +396,7 @@ Formatting rules:
     }
 
     let attemptMessages = modelMessages;
-    let completionText = '';
+    let acceptedBubbles: string[] | null = null;
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
@@ -377,9 +411,7 @@ Formatting rules:
           const errorMessage =
             'validation: model returned options/template output instead of in-character chat';
 
-          await appendConversationLog({
-            ts: new Date().toISOString(),
-            type: 'llm_error',
+          await appendLlmErrorEvent({
             requestId,
             mode,
             stage: 'output_check',
@@ -407,9 +439,7 @@ Formatting rules:
         if (isRepetitiveStartReply(mode, candidateBubbles)) {
           const errorMessage = 'validation: repetitive start opener style detected';
 
-          await appendConversationLog({
-            ts: new Date().toISOString(),
-            type: 'llm_error',
+          await appendLlmErrorEvent({
             requestId,
             mode,
             stage: 'output_check',
@@ -433,15 +463,13 @@ Formatting rules:
           continue;
         }
 
-        completionText = candidateText;
+        acceptedBubbles = candidateBubbles;
         break;
       } catch (error) {
         const errorMessage = toErrorMessage(error);
         const errorClass = classifyError(error);
 
-        await appendConversationLog({
-          ts: new Date().toISOString(),
-          type: 'llm_error',
+        await appendLlmErrorEvent({
           requestId,
           mode,
           stage: 'generateText',
@@ -460,12 +488,11 @@ Formatting rules:
       }
     }
 
-    if (!completionText) {
+    if (!acceptedBubbles) {
       throw new Error('validation: No response generated.');
     }
 
-    const bubbles = extractBubblesFromFallback(completionText);
-    if (bubbles.length === 0) {
+    if (acceptedBubbles.length === 0) {
       throw new Error('validation: No bubbles generated.');
     }
 
@@ -479,12 +506,12 @@ Formatting rules:
       durationMs: Date.now() - requestStartedAt,
       ip: clientIp,
       userAgent,
-      bubbles,
+      bubbles: acceptedBubbles,
     });
 
     return NextResponse.json({
       assistant: {
-        bubbles,
+        bubbles: acceptedBubbles,
       },
       meta: { proactiveEligible: true },
     });

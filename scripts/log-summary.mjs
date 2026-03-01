@@ -1,20 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-
-function getArg(name, fallback) {
-  const prefix = `--${name}=`;
-  const arg = process.argv.find((value) => value.startsWith(prefix));
-  return arg ? arg.slice(prefix.length) : fallback;
-}
-
-function safeJson(line) {
-  try {
-    return JSON.parse(line);
-  } catch {
-    return null;
-  }
-}
+import { getArg, safeJson } from './lib/log-utils.mjs';
 
 function inc(map, key, by = 1) {
   map.set(key, (map.get(key) ?? 0) + by);
