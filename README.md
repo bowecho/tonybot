@@ -1,39 +1,89 @@
-# tonybot (simple mode)
+# tonybot
 
-Minimal web chatbot for short public demos.
+A web-based chat app styled like iMessage, powered by OpenRouter.
 
-- No auth
-- No database
-- Stateless (messages exist only in-browser for the current page session)
-- Uses OpenRouter + Claude Sonnet 4.6
-- Server-side key usage only (`OPENROUTER_API_KEY` stays off the client)
+## Features
+- Responsive chat UI for desktop and mobile
+- Typing indicator and multi-bubble responses
+- Proactive idle messages for natural conversation flow
+- Server-side LLM calls (API key is not exposed to the browser)
+- Local conversation logging + CLI log tools
+
+## Tech Stack
+- Next.js (App Router)
+- React + TypeScript
+- OpenRouter (`@openrouter/ai-sdk-provider` + `ai`)
+
+## Requirements
+- Node.js 20+
+- npm
+- OpenRouter API key
 
 ## Setup
+1. Install dependencies:
 
-1. Put your OpenRouter key in `.env.local`:
+```bash
+npm install
+```
+
+2. Create `.env.local` in the project root:
 
 ```env
-OPENROUTER_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_openrouter_key
 OPENROUTER_MODEL=anthropic/claude-sonnet-4.6
 TONYBOT_MAX_INPUT_CHARS=5000
 ```
 
-2. Install and run:
+3. Add your persona file in the project root:
+- Preferred: `persona_v2.txt`
+- Fallback: `persona.txt`
+
+4. Start development server:
 
 ```bash
-npm install
 npm run dev
 ```
 
-3. Open `http://localhost:3000`.
+5. Open:
+- `http://localhost:3000`
 
-## Expose publicly from your router
+## Production
+Build and run:
 
-- Forward your chosen external port to this machine on `3000`.
-- If using a reverse proxy (recommended), proxy to `http://127.0.0.1:3000`.
-- Turn the app off when done.
+```bash
+npm run build
+npm run start
+```
 
-## Important
+## Logging Tools
+Conversation logs are written to `logs/` in NDJSON format.
 
-- Because this is intentionally simple and public, use it only for short demos.
-- Rotate API keys if they were shared in chat.
+- Summary for today:
+
+```bash
+npm run logs:today
+```
+
+- Summary for a date:
+
+```bash
+npm run logs:summary -- --date=YYYY-MM-DD
+```
+
+- Live tail:
+
+```bash
+npm run logs:live
+npm run logs:live -- --ip=YOUR_IP
+```
+
+- Export transcript for one IP:
+
+```bash
+npm run logs:transcript -- --date=YYYY-MM-DD --ip=YOUR_IP
+```
+
+## Security Notes
+- Keep `.env.local` private.
+- Do not commit local persona files with personal data.
+- If exposing publicly, run behind standard network protections (firewall/reverse proxy/rate limits).
