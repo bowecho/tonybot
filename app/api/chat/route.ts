@@ -231,8 +231,21 @@ function toErrorMessage(error: unknown) {
   return String(error).slice(0, 500);
 }
 
+function isMissingPersonaError(error: unknown) {
+  const text = toErrorMessage(error).toLowerCase();
+  return (
+    text.includes('no usable system prompt found') &&
+    text.includes('persona_v2.txt') &&
+    text.includes('persona.txt')
+  );
+}
+
 function classifyError(error: unknown) {
   const text = toErrorMessage(error).toLowerCase();
+
+  if (isMissingPersonaError(error)) {
+    return 'config';
+  }
 
   if (
     text.includes('timeout') ||
@@ -531,9 +544,13 @@ Formatting rules:
       errorMessage,
     });
 
+    const fallbackBubbles = isMissingPersonaError(error)
+      ? ['Setup issue: add persona_v2.txt or persona.txt to the project root, then reload the app.']
+      : ['One sec, had a hiccup. Try that again?'];
+
     return NextResponse.json({
       assistant: {
-        bubbles: ['One sec, had a hiccup. Try that again?'],
+        bubbles: fallbackBubbles,
       },
       meta: { proactiveEligible: false },
     });
